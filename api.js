@@ -1,43 +1,29 @@
-import { Box, Table, TableBody, TableCell, TableHeader, TableRow, Text } from 'grommet';
-import React, { useEffect, useState } from 'react';
+// Core Imports
+import GraniteError from 'granite-admin/utils/granite-error';
+import GraniteAPIClient from 'granite-admin/utils/granite-client';
 
-const Api = ({ advice }) => {
-  return (
-    <Box>
-      <Table>
-        <TableHeader pad="2rem">
-          <TableRow>
-            <TableCell scope="col" border="bottom">
-              Username
-            </TableCell>
-            <TableCell scope="col" border="bottom">
-              Category
-            </TableCell>
-            <TableCell scope="col" border="bottom">
-              Rep
-            </TableCell>
-          </TableRow>
-        // </TableHeader>
-        {advice.map(e => {
-          return (
-            <TableRow pad="medium">
-              <TableCell scope="row">{e.API}</TableCell>
-              <TableCell scope="row">{e.Category}</TableCell>
-              <TableCell scope="row">{e.Cors}</TableCell>
-            </TableRow>
-          );
-        })}
-      </Table>
+// Application Imports
+import CustomerEntity from 'customers/entities/customer';
+import ProductEntity from 'customers/entities/product';
+import ProductVariant from 'customers/entities/productVariant';
 
+// import AddressEntity from 'granite-admin/organisations/entities/address'
 
+/* eslint-disable */
+const url = process.env.REACT_APP_CUSTOMER_BASE_URL;
 
+async function getCustomers(params) {
+  const payload = { params: { ...params } };
+  try {
+    const { data } = await GraniteAPIClient(url).get('/', payload);
+    const list = data ? data.results?.map(item => new CustomerEntity({ mapValues: true, ...item })) : [];
 
+    return { list, count: data.count };
+  } catch (e) {
+    throw new GraniteError(e);
+  }
+}
 
-
-
-
-    </Box>
-  );
+export default {
+  getCustomers,
 };
-
-export default Api;

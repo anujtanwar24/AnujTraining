@@ -1,53 +1,132 @@
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { connect } from 'react-redux';
+import { Box } from 'grommet';
+import { useParams } from 'react-router-dom';
+import PropTypes from 'prop-types';
+// import { Share } from 'grommet-icons';
+import { Trash } from 'grommet-icons';
+
+// Core Imports
+import EventEmitter from 'granite-admin/utils/event-emitter';
+import Loader from 'granite-admin/core/components/Loader';
+import List from 'granite-admin/core/components/List';
+
+// Application Imports
+import { COLUMNS } from 'customers/controllers/constants';
+
+import customerAPI from '../../anuj/gateway/api';
+
+import * as OrganisationDucks from 'granite-admin/organisations/ducks/organisations';
+import { getStatusList } from 'granite-admin/common/controllers/status-master';
+import { searchEmployee, validateCustomerData } from 'customers/controllers/customer';
+import Details from '../customerList/components/Details';
 import {
-  Box,
-  Grid,
-  Image,
-  Text,
-  Stack,
-  Table,
-  TableHeader,
-  TableRow,
-  TableCell,
-  TableBody,
-  Tab,
-  Tabs,
-  FormField,
-  TextInput,
+  Avatar,
+  // Box,
   Button,
   Form,
-  Select,
-  TextArea,
+  FormField,
+  Grid,
+  Image,
   Layer,
+  // List,
+  Select,
+  Stack,
+  Tab,
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+  Tabs,
+  Text,
+  TextArea,
+  TextInput,
 } from 'grommet';
-import Avatar from 'granite-admin/core/components/Avatar';
-import { Edit } from 'grommet-icons';
-import { colors } from 'grommet/themes/base';
-import Api from '../../anuj/index';
-import { useState } from 'react';
-import { useEffect } from 'react';
-
+// import React from 'react';
+import laptop from 'assets/laptop.png';
+import monitor from 'assets/monitor.png';
+import { Edit, User } from 'grommet-icons';
+// import { useState } from 'react';
+// import { useEffect } from 'react';
+// import { COLUMNS } from '../../jatinList/controllers/constants';
+// import SplitLayout from 'granite-admin/core/components/SplitLayout';
 function Anuj() {
   const [value, setValue] = React.useState({});
   const [show, setShow] = useState('');
-  const [advice, setAdvice] = useState([]);
-  const url = 'https://api.publicapis.org/entries';
-  const fetchData = async () => {
-    try {
-      const response = await fetch(url);
+  // const [advice, setAdvice] = useState([]);
+  // const url = 'https://api.publicapis.org/entries';
+  // const fetchData = async () => {
+  //   try {
+  //     const response = await fetch(url);
 
-      const json = await response.json();
-      const splic = json.entries.slice(55, 72);
-      console.log(json);
-      setAdvice(splic);
-    } catch (error) {
-      console.log('error', error);
-    }
-  };
+  //     const json = await response.json();
+  //     const splic = json.entries.slice(55, 72);
+  //     console.log(json);
+  //     setAdvice(splic);
+  //   } catch (error) {
+  //     console.log('error', error);
+  //   }
+  // };
+
+  // useEffect(() => {
+  //   fetchData();
+  // }, []);
+  const { status } = useParams();
+  const eventEmitter = useMemo(() => new EventEmitter(), []);
+  const [statusList, setStatusList] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchData();
+    const subscription = eventEmitter.getObservable().subscribe(event => {
+      switch (event.type) {
+        case 'STATUS_GET_SUCCESS':
+          setStatusList(event.data);
+          setLoading(false);
+          break;
+        default:
+      }
+    });
+    getStatusList(eventEmitter, { entity_name: 'customers_customer' });
+    return () => subscription.unsubscribe();
+  }, [eventEmitter]);
+
+  const getCustomers = useCallback(
+    async data => {
+      return await customerAPI.getCustomers({
+        ...data,
+        status: statusList.find(i => i.status_name.toLowerCase() === status)?.pk,
+      });
+    },
+    [status, statusList],
+  );
+
+  // const handleEditClick = useCallback(({ pk }) => history.push(`/customers/${pk}`), [history]);
+
+  const handleDeleteClick = useCallback(async ({ pk }) => {
+    return await customerAPI.deleteCustomer(pk);
   }, []);
+
+  const updateCustomer = useCallback(async data => {
+    if (data.pk) return await customerAPI.updateStatus(data);
+    let res = await validateCustomerData(data);
+    let customer = { ...res, phone: res.phone.phone };
+    delete customer['errors'];
+    return await customerAPI.updateCustomer(customer);
+  }, []);
+
+  const deleteBulkRows = async selected => {
+    let userList = selected.map(user => {
+      return user.pk;
+    });
+    try {
+      await customerAPI.deleteBulkCustomers(userList);
+      eventEmitter.emit('SET_TOAST', { message: 'Selected users deleted successfully' });
+      eventEmitter.emit('FETCH_LIST');
+    } catch (e) {
+      console.log(e);
+      eventEmitter.emit('SET_TOAST', { message: 'Could not delete. Please try again later', color: 'status-error' });
+    }}
   return (
     <Box overflow="hidden">
       <Grid
@@ -128,7 +207,68 @@ function Anuj() {
             <Box>
               <Tab title="User's List">
                 <Box pad="medium">
-                  <Api advice={advice} />
+                 
+                <List
+                    label={'Customer'}
+                    // selectable={true}
+                    queryKey="q"
+                    columns={COLUMNS}
+                    actionIconColor="secondary"
+                    deleteHandler={handleDeleteClick}
+                    fetch={getCustomers}
+                    //update={updateCustomer}
+                    eventEmitter={eventEmitter}
+                   // searchPlaceholder="Search Customers by Name and Email ID"
+                    deleteBulk={true}
+                    bulkActions={[
+                      // {
+                      //   name: 'archive',
+                      //   label: 'Archive',
+                      //   icon: <Archive size="20px" />,
+                      //   onClick: e => console.log('action 1', e),
+                      // },
+                      // {
+                      //   name: 'export',
+                      //   label: 'Export',
+                      //   icon: <Download size="20px" />,
+                      //   onClick: e => console.log('action 1', e),
+                      // },
+                      {
+                        name: 'delete',
+                        label: 'Delete',
+                        icon: <Trash size="20px" />,
+                        onClick: deleteBulkRows,
+                      },
+                    ]}
+                    // filters={[
+                    //   {
+                    //     name: 'employee',
+                    //     label: 'User',
+                    //     value: '',
+                    //     type: 'autocomplete',
+                    //     fetch: q => searchEmployee(q),
+                    //     labelKey: 'name',
+                    //     valueKey: 'name',
+                    //   },
+                    // ]}
+                    sideContent={Details}
+                    status={statusList}
+                    editInNewTab={true}
+                    addRowOptions={{
+                      colsId: ['name', 'email', 'phone'],
+                      defaultObject: {
+                        status: 1,
+                        country_code: 'IN',
+                        phone: { phone: '+91' },
+                      },
+                      validate: {
+                        name: d => (d ? true : 'Name is required'),
+                        email: d => (d ? true : 'Email is required'),
+                        'phone.phone': d => (d.length > 7 && d.length < 14 ? true : 'Not a valid number'),
+                      },
+                      saveOn: 'phone.phone',
+                    }}
+                  />
                 </Box>
               </Tab>
             </Box>
